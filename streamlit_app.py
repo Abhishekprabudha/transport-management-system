@@ -1,4 +1,5 @@
 import streamlit as st
+from datetime import datetime
 from app.services.repo import TMSRepository
 from app.utils.auth import login_panel
 from app.utils.styles import inject_styles
@@ -43,11 +44,26 @@ def render_cursory_task(page_key: str, button_text: str, result_text: str):
     if st.session_state.get(action_key):
         st.success(result_text)
 
+
+if "screen_records" not in st.session_state:
+    st.session_state.screen_records = []
+
+
+def render_record_button(page_label: str):
+    record_key = f"{page_label.lower().replace(' ', '_')}_recorded"
+    if st.button("Record this screen update", key=f"{record_key}_button"):
+        st.session_state.screen_records.append(
+            {"Screen": page_label, "Recorded At": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")}
+        )
+        st.session_state[record_key] = True
+    if st.session_state.get(record_key):
+        st.success(f"{page_label} update recorded for overview tracking.")
+
 st.title("Transportation Management System")
 st.caption("Unified backend operating layer for planning, execution, monitoring, and analytics")
 
 if page == "Overview":
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1:
         kpi_card("Active Trips", summary["active_trips"], "+12 today")
     with c2:
@@ -58,6 +74,8 @@ if page == "Overview":
         kpi_card("ePOD Open", summary["open_epod"], "Awaiting closure")
     with c5:
         kpi_card("Transporters", summary["transporters"], "Active network")
+    with c6:
+        kpi_card("Screen Records", len(st.session_state.screen_records), "Captured from other modules")
 
     left, right = st.columns([1.1, 1])
     with left:
@@ -79,9 +97,15 @@ if page == "Overview":
     with right:
         st.subheader("Today’s Dispatch Queue")
         st.dataframe(repo.get_dispatch_table(), use_container_width=True, hide_index=True)
+        st.subheader("Recent Screen Records")
+        if st.session_state.screen_records:
+            st.dataframe(st.session_state.screen_records[-5:], use_container_width=True, hide_index=True)
+        else:
+            st.info("No screen updates have been recorded yet.")
 
 elif page == "Contracts":
     st.subheader("Vendor Contracts Management")
+    render_record_button("Contracts")
     active_contracts = int((repo.get_contracts()["Status"] == "Active").sum())
     render_cursory_task(
         "contracts",
@@ -93,6 +117,7 @@ elif page == "Contracts":
 
 elif page == "Spot Auction":
     st.subheader("Spot Auction / RFP Console")
+    render_record_button("Spot Auction")
     open_auctions = int((repo.get_auctions()["Status"] == "Open").sum())
     render_cursory_task(
         "spot_auction",
@@ -109,6 +134,7 @@ elif page == "Spot Auction":
 
 elif page == "Dispatch Planner":
     st.subheader("Dispatch Planning & Load Builder")
+    render_record_button("Dispatch Planner")
     in_dispatch = int((repo.get_dispatch_table()["Status"] == "In Dispatch").sum())
     render_cursory_task(
         "dispatch_planner",
@@ -122,6 +148,7 @@ elif page == "Dispatch Planner":
 
 elif page == "Vehicle Indenting":
     st.subheader("Auto Vehicle Indenting")
+    render_record_button("Vehicle Indenting")
     indented = int((repo.get_indents()["Status"] == "Indented").sum())
     render_cursory_task(
         "vehicle_indenting",
@@ -133,6 +160,7 @@ elif page == "Vehicle Indenting":
 
 elif page == "Tracking Control Tower":
     st.subheader("Vehicle Tracking / Control Tower")
+    render_record_button("Tracking Control Tower")
     trips = repo.get_trips()
     delayed_trips = int((trips["Status"] == "Delayed").sum())
     render_cursory_task(
@@ -152,6 +180,7 @@ elif page == "Tracking Control Tower":
 
 elif page == "E-POD":
     st.subheader("Electronic Proof of Delivery")
+    render_record_button("E-POD")
     open_epods = int((repo.get_epod()["Status"] == "Open").sum())
     render_cursory_task(
         "epod",
@@ -163,6 +192,7 @@ elif page == "E-POD":
 
 elif page == "Freight Settlement":
     st.subheader("Freight Settlement & Audit")
+    render_record_button("Freight Settlement")
     pending_invoices = int((repo.get_invoices()["Status"] != "Approved").sum())
     render_cursory_task(
         "freight_settlement",
@@ -177,6 +207,7 @@ elif page == "Freight Settlement":
 
 elif page == "Analytics":
     st.subheader("Dashboard & Analytics")
+    render_record_button("Analytics")
     top_carrier = repo.get_carrier_kpis().sort_values("On-time", ascending=False).iloc[0]["Carrier"]
     render_cursory_task(
         "analytics",
@@ -193,6 +224,7 @@ elif page == "Analytics":
 
 elif page == "Admin":
     st.subheader("Master Data & System Configuration")
+    render_record_button("Admin")
     render_cursory_task(
         "admin",
         "Run master data sanity check",
